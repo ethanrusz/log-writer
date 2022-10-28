@@ -7,6 +7,10 @@ import pandas as pd
 import numpy as np
 
 
+def convert_df_csv(df):
+    return df.to_csv(index=False).encode('utf-8')
+
+
 def random_timestamp_from_range(date_range) -> str:
     """Generates a random timestamp between a start and end date.
 
@@ -16,7 +20,7 @@ def random_timestamp_from_range(date_range) -> str:
     datetime_range = [datetime.combine(d, datetime.min.time()) for d in date_range]  # Convert date to datetime
     start, end = datetime_range  # Split tuple
     random_timestamp = start + (
-                (end + timedelta(days=1)) - start) * random.random()  # Get random date between start and end
+            (end + timedelta(days=1)) - start) * random.random()  # Get random date between start and end
 
     return datetime.strftime(random_timestamp, '%Y-%m-%d %T')  # Return as string
 
@@ -56,19 +60,29 @@ def main():
     with st.form('params'):
         usernames = st.text_area('Usernames', help="Seperated by comma or newline").strip()
         usernames = [u.strip().lower() for u in usernames.replace('\n', ',').split(',')]
-        date_range = st.date_input('Date Range', [])
+        date_range = st.date_input('Date range', [])
         quantity = st.number_input('Records', min_value=1, value=50)
         bias = st.slider('Success probability', min_value=0.00, max_value=1.00, value=0.75,
                          help='Chance that each login attempt will be successful')
-        st.selectbox('Output as', ['DataFrame', 'CSV'], disabled=True)
+        output_type = st.selectbox('Output as', ['CSV', 'DataFrame'])
 
         submit = st.form_submit_button('Generate')
 
     if submit:
         df_logs = generate_logs_df(usernames, date_range, quantity, bias)
+
         st.header('Output')
-        st.info('Only DataFrame output is available for now.')
-        st.dataframe(df_logs)
+
+        if output_type == 'CSV':
+            csv = convert_df_csv(df_logs)  # Convert to file
+            st.download_button(  # Allow user to download
+                "Download CSV",
+                csv,
+                'output.csv',
+                'text/csv',
+            )
+
+        st.dataframe(df_logs)  # Show results
 
 
 if __name__ == '__main__':
