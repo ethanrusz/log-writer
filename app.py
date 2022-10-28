@@ -1,9 +1,10 @@
 import datetime
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 
 def random_timestamp_from_range(date_range) -> str:
@@ -14,14 +15,16 @@ def random_timestamp_from_range(date_range) -> str:
     """
     datetime_range = [datetime.combine(d, datetime.min.time()) for d in date_range]  # Convert date to datetime
     start, end = datetime_range  # Split tuple
-    random_timestamp = start + (end - start) * random.random()  # Get random date between start and end
+    random_timestamp = start + (
+                (end + timedelta(days=1)) - start) * random.random()  # Get random date between start and end
 
     return datetime.strftime(random_timestamp, '%Y-%m-%d %T')  # Return as string
 
 
-def generate_logs_df(usernames, date_range, quantity) -> pd.DataFrame:
+def generate_logs_df(usernames, date_range, quantity, bias) -> pd.DataFrame:
     """Creates a DataFrame of dummy login attempts within provided parameters.
 
+    :param bias: bias towards successful logins
     :param usernames: List of usernames
     :param date_range: Start and end date of logs
     :param quantity: Number of rows to generate
@@ -32,34 +35,37 @@ def generate_logs_df(usernames, date_range, quantity) -> pd.DataFrame:
     for row in range(quantity):  # Generate each log row
         username = random.choice(usernames)  # Pick random username from list
         timestamp = random_timestamp_from_range(date_range)  # Fetch timestamp
-        successful = random.choice(['Y', 'N'])  # Randomly pick success
+        successful = np.random.choice(['Y', 'N'], p=[bias, 1 - bias])  # Pick success or failure with probability
 
-        df = df.append({  # Add to DataFrame
+        insert_row = {
             'log_id': row + 1,
             'username': username,
             'timestamp': timestamp,
-            'successful': successful
-        }, ignore_index=True)
+            'successful': successful,
+        }
+        df = pd.concat([df, pd.DataFrame([insert_row])])  # Concat each new row to DataFrame
 
-    return df
+    return df.set_index(df.log_id)
 
 
 def main():
-    st.set_page_config('TMC Log Generator', '📋')
-    st.title("Log Generator")
+    st.set_page_config('Log Generator', '📋')
+    st.title("Login Record Generator")
 
     st.header('Input')
     with st.form('params'):
         usernames = st.text_area('Usernames', help="Seperated by comma or newline").strip()
         usernames = [u.strip().lower() for u in usernames.replace('\n', ',').split(',')]
         date_range = st.date_input('Date Range', [])
-        quantity = st.slider('Records', min_value=1, max_value=500, value=50)
+        quantity = st.number_input('Records', min_value=1, value=50)
+        bias = st.slider('Success probability', min_value=0.00, max_value=1.00, value=0.75,
+                         help='Chance that each login attempt will be successful')
         st.selectbox('Output as', ['DataFrame', 'CSV'], disabled=True)
 
         submit = st.form_submit_button('Generate')
 
     if submit:
-        df_logs = generate_logs_df(usernames, date_range, quantity)
+        df_logs = generate_logs_df(usernames, date_range, quantity, bias)
         st.header('Output')
         st.info('Only DataFrame output is available for now.')
         st.dataframe(df_logs)
